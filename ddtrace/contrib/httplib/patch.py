@@ -30,6 +30,9 @@ def _wrap_getresponse(func, instance, args, kwargs):
     resp = None
     try:
         resp = func(*args, **kwargs)
+        if not resp:
+            log.warning('empty response from the agent detected!')
+
         return resp
     finally:
         try:
@@ -44,6 +47,7 @@ def _wrap_getresponse(func, instance, args, kwargs):
 
             span.finish()
             delattr(instance, '_datadog_span')
+            log.warning('getresponse: response = {}'.format(resp))
         except Exception:
             log.debug('error applying request tags', exc_info=True)
 
@@ -76,10 +80,14 @@ def _wrap_putrequest(func, instance, args, kwargs):
 def should_skip_request(pin, request):
     """Helper to determine if the provided request should be traced"""
     if not pin or not pin.enabled():
+        log.warning('skipping instrumentation: pin = {}'.format(pin))
         return True
 
     api = pin.tracer.writer.api
-    return request.host == api.hostname and request.port == api.port
+    skip = request.host == api.hostname and request.port == api.port
+    if skip:
+        log.warning('skipping instrumentation: skip = {}'.format(skip))
+    return skip
 
 
 def patch():
